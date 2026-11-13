@@ -60,7 +60,7 @@ Cenários do modo demonstração: `http://localhost:1420/?cenario=ausente#overvi
    npx tauri signer generate -w "%USERPROFILE%\.tauri\ai-memory-manager.key"
    ```
 
-2. **Troque o `plugins.updater.pubkey` do `src-tauri/tauri.conf.json`** pelo conteúdo do `.key.pub`. O valor atual é uma chave **de desenvolvimento**.
+2. **Confira o `plugins.updater.pubkey` do `src-tauri/tauri.conf.json`**: ele deve ser o conteúdo do `.key.pub`. A chave de produção já está configurada; só troque se gerar uma chave nova.
 3. **Cadastre os secrets do GitHub.** No repositório, em *Settings → Secrets → Actions*, crie `TAURI_SIGNING_PRIVATE_KEY` (conteúdo do `.key`) e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 4. **Publique.** Ajuste a versão em `package.json`, `src-tauri/Cargo.toml` e `src-tauri/tauri.conf.json`, depois rode `git tag vX.Y.Z && git push --tags`. O workflow `.github/workflows/release.yml` testa, gera o build, assina e publica o `latest.json`.
 
