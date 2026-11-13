@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 13/11/2026
+
+- Primeira release publicada (a tag v0.1.0 falhou no build por BOM no package.json; sem binários).
+- Codex: MCP pela ponte local `ai-memory.exe mcp-bridge`, sem gravar token.
+- Backfill: importação parcial exibida como parcial, com explicação dos avisos.
+
 ## 0.1.0 — 13/11/2026
 
 Primeira versão.

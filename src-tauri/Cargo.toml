@@ -1,6 +1,6 @@
 [package]
 name = "ai-memory-manager"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI Memory Manager — GUI para gerenciar o ai-memory no Windows"
 authors = ["lucasmonteir0"]
 edition = "2024"

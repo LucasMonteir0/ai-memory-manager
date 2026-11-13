@@ -17,10 +17,12 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::Ptr
 
 # versão sincronizada em package.json, Cargo.toml e tauri.conf.json
 npm version $Version --no-git-tag-version | Out-Null
-(Get-Content src-tauri\Cargo.toml -Raw) -replace '(?m)^version = "[^"]+"', "version = `"$Version`"" | Set-Content -NoNewline src-tauri\Cargo.toml
+$utf8 = New-Object System.Text.UTF8Encoding($false)  # sem BOM: o tauri-action rejeita JSON com BOM
+$cargo = Join-Path $root "src-tauri\Cargo.toml"
+[IO.File]::WriteAllText($cargo, ((Get-Content $cargo -Raw) -replace '(?m)^version = "[^"]+"', "version = `"$Version`""), $utf8)
 $conf = Get-Content src-tauri\tauri.conf.json -Raw | ConvertFrom-Json
 $conf.version = $Version
-$conf | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 src-tauri\tauri.conf.json
+[IO.File]::WriteAllText((Join-Path $root "src-tauri\tauri.conf.json"), ($conf | ConvertTo-Json -Depth 20), $utf8)
 
 cargo test --lib --manifest-path src-tauri\Cargo.toml
 npm test
@@ -38,7 +40,7 @@ $latest = @{
   platforms = @{ "windows-x86_64" = @{ signature = (Get-Content $sig -Raw).Trim(); url = $url } }
 } | ConvertTo-Json -Depth 5
 $latestPath = Join-Path $nsis "latest.json"
-Set-Content -Encoding utf8 $latestPath $latest
+[IO.File]::WriteAllText($latestPath, $latest, $utf8)
 Write-Host "Gerado: $($setup.FullName)`n        $sig`n        $latestPath"
 
 if ($Publish) {
