@@ -11,7 +11,7 @@ import { Alert, Badge, Button, Card, CardBody, CardHeader, CardTitle, Dialog, Di
 import { IntegrationBadge } from "@/components/StatusBadge";
 import { usePlanner } from "@/components/Planner";
 import { OpConsole } from "@/components/OpConsole";
-import { agentLabel, cn, fmtDate, fmtNum } from "@/lib/utils";
+import { agentLabel, backfillOutcome, cn, fmtDate, fmtNum } from "@/lib/utils";
 
 function AddProjectDialog({ open, onOpenChange, initialPath }: { open: boolean; onOpenChange: (o: boolean) => void; initialPath?: string }) {
   const qc = useQueryClient();
@@ -207,9 +207,10 @@ function BackfillBox({ project }: { project: Project }) {
       const r = await api.backfillRun(project.id, force, max, id);
       setReal(r);
       setDryFor(null);
-      if (r.output.cancelled) toast.warning("Importação cancelada.");
-      else if (r.output.exitCode === 0) toast.success("Importação concluída.");
-      else toast.error("Importação terminou com erro.");
+      const o = backfillOutcome(r, max);
+      if (o.tone === "ok") toast.success(o.title);
+      else if (o.tone === "err") toast.error(o.title);
+      else toast.warning(o.title);
       qc.invalidateQueries();
     } catch (e) {
       toast.error("Importação falhou", { description: errMsg(e) });
@@ -280,6 +281,21 @@ function BackfillBox({ project }: { project: Project }) {
             <Kv k="Puladas (limite)" v={fmtNum(r.skippedForCap)} />
           </div>
         )}
+        {real &&
+          (() => {
+            const o = backfillOutcome(real, max);
+            return (
+              <Alert tone={o.tone} title={o.title}>
+                {o.notes.length > 0 && (
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                    {o.notes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                )}
+              </Alert>
+            );
+          })()}
         <p className="text-xs text-muted">
           Backfill importa histórico; ele <b>não</b> prova que hooks de sessões novas estão funcionando — use “Verificar captura” em Agentes.
         </p>
