@@ -1,0 +1,12 @@
+{
+  "workspace": "default",
+  "project": "projeto-a",
+  "selected": 0,
+  "imported_sessions": 0,
+  "imported_events": 0,
+  "skipped_for_cap": 0,
+  "failed_sessions": 0,
+  "skipped_non_empty": true,
+  "skipped_not_admitted": false,
+  "dry_run": true
+}

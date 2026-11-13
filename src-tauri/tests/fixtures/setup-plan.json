@@ -1,0 +1,71 @@
+{
+  "format": 1,
+  "data_dir": "\\\\?\\C:\\Users\\usuario\\AppData\\Local\\ai-memory",
+  "config_path": "\\\\?\\C:\\Users\\usuario\\AppData\\Local\\ai-memory\\config.toml",
+  "fresh": false,
+  "service": {
+    "action": "install",
+    "manager": "Windows logon entry",
+    "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\ai-memory"
+  },
+  "agents": [
+    {
+      "agent": "claude-code",
+      "found": {
+        "kind": "session_store",
+        "path": "C:/Users/usuario\\.claude/projects"
+      },
+      "wiring": "mcp+hooks+skills"
+    },
+    {
+      "agent": "codex",
+      "found": {
+        "kind": "session_store",
+        "path": "C:/Users/usuario\\.codex/sessions"
+      },
+      "wiring": "mcp+hooks+skills"
+    },
+    {
+      "agent": "copilot-cli",
+      "found": {
+        "kind": "session_store",
+        "path": "C:/Users/usuario\\.copilot/session-state"
+      },
+      "wiring": "mcp+hooks+skills"
+    }
+  ],
+  "other_agents": [
+    "cursor",
+    "gemini-cli",
+    "open-code",
+    "opencode2",
+    "pi",
+    "omp",
+    "openclaw",
+    "antigravity-cli",
+    "grok",
+    "zero",
+    "devin",
+    "kimi-code",
+    "kiro-cli",
+    "kiro-cli-v3",
+    "command-code",
+    "pool",
+    "zcode",
+    "hermes",
+    "droid",
+    "muse",
+    "codebuddy",
+    "ibm-bob",
+    "dsh",
+    "cline",
+    "qwen-code",
+    "qoder"
+  ],
+  "checks": [
+    "healthz",
+    "memory_status",
+    "doctor"
+  ],
+  "first_question": "What do you remember about this project?"
+}

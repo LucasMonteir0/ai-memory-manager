@@ -1,0 +1,92 @@
+{
+  "workspace": "default",
+  "project": "projeto-a",
+  "server": "http://127.0.0.1:49374",
+  "since_days": 30,
+  "rows": [
+    {
+      "agent": "claude-code",
+      "local_total": 31,
+      "local_recent": 31,
+      "captured": 22,
+      "uncaptured": false,
+      "mixed_capture_sessions": 21
+    },
+    {
+      "agent": "codex",
+      "local_total": 4,
+      "local_recent": 4,
+      "captured": 4,
+      "uncaptured": false,
+      "mixed_capture_sessions": 3
+    }
+  ],
+  "capture_coverage_problem": null,
+  "uncaptured": [],
+  "marker_capture_problem": null,
+  "capture_owner_active": false,
+  "identity": {
+    "version": "3.4.6",
+    "level": "root",
+    "operator": null,
+    "distinguishes_operators": false
+  },
+  "auth_posture": "token",
+  "project_coordinate": {
+    "local": {
+      "marker_status": "absent",
+      "scope_source": "fallback",
+      "identity_source": null,
+      "identity_style": null,
+      "canonical_candidate": null,
+      "legacy_candidate": null,
+      "messages": []
+    },
+    "server": {
+      "workspace": "default",
+      "requested_name": "projeto-a",
+      "status": "exact",
+      "project_id": "00000000-0000-0000-0000-000000000001",
+      "current_name": "projeto-a",
+      "canonical_candidate": null,
+      "legacy_candidate": null,
+      "identity_source": null,
+      "identity_style": null,
+      "rename_eligible": false,
+      "collision_reason": null,
+      "candidate_count": 1
+    },
+    "server_problem": null
+  },
+  "native_memory": [
+    {
+      "agent": "claude-code",
+      "path": "C:/Users/usuario\\.claude/projects\\F--repos-projeto-a\\memory",
+      "file_count": 3,
+      "status": "not excluded"
+    }
+  ],
+  "spool": {
+    "pending": 1,
+    "oldest_age_ms": 1322,
+    "retries_total": 0,
+    "capacity": 10000
+  },
+  "server_unreachable": false,
+  "codex_hooks": {
+    "trusted": [
+      "preToolUse",
+      "postToolUse",
+      "preCompact",
+      "sessionStart",
+      "sessionEnd",
+      "userPromptSubmit",
+      "stop"
+    ],
+    "skipped": []
+  },
+  "agentmemory_residue": [],
+  "plugins": [],
+  "muse": null,
+  "hermes": []
+}

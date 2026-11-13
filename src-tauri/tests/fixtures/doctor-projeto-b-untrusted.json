@@ -1,0 +1,77 @@
+{
+  "workspace": "default",
+  "project": "projeto-b",
+  "server": "http://127.0.0.1:49374",
+  "since_days": 30,
+  "rows": [
+    {
+      "agent": "claude-code",
+      "local_total": 12,
+      "local_recent": 9,
+      "captured": 0,
+      "uncaptured": true,
+      "mixed_capture_sessions": 0
+    },
+    {
+      "agent": "codex",
+      "local_total": 3,
+      "local_recent": 3,
+      "captured": 1,
+      "uncaptured": false,
+      "mixed_capture_sessions": 0
+    }
+  ],
+  "capture_coverage_problem": "claude-code has local sessions that were never captured",
+  "uncaptured": ["claude-code"],
+  "marker_capture_problem": null,
+  "capture_owner_active": false,
+  "identity": {
+    "version": "3.4.6",
+    "level": "root",
+    "operator": null,
+    "distinguishes_operators": false
+  },
+  "auth_posture": "token",
+  "project_coordinate": {
+    "local": {
+      "marker_status": "present",
+      "scope_source": "marker",
+      "identity_source": null,
+      "identity_style": null,
+      "canonical_candidate": null,
+      "legacy_candidate": null,
+      "messages": []
+    },
+    "server": {
+      "workspace": "default",
+      "requested_name": "projeto-b",
+      "status": "missing",
+      "project_id": null,
+      "current_name": null,
+      "canonical_candidate": null,
+      "legacy_candidate": null,
+      "identity_source": null,
+      "identity_style": null,
+      "rename_eligible": false,
+      "collision_reason": null,
+      "candidate_count": 0
+    },
+    "server_problem": null
+  },
+  "native_memory": [],
+  "spool": {
+    "pending": 340,
+    "oldest_age_ms": 7200000,
+    "retries_total": 12,
+    "capacity": 10000
+  },
+  "server_unreachable": false,
+  "codex_hooks": {
+    "trusted": ["sessionStart", "sessionEnd"],
+    "skipped": ["preToolUse", "postToolUse", "preCompact", "userPromptSubmit", "stop"]
+  },
+  "agentmemory_residue": [],
+  "plugins": [],
+  "muse": null,
+  "hermes": []
+}

@@ -1,0 +1,13 @@
+ai-memory.exe : 2026-11-13T17:04:27.672804Z  INFO ai_memory_cli: ai-memory starting version="3.4.6" 
+server_url=http://127.0.0.1:49374/ data_dir=C:\Users\usuario\AppData\Local\ai-memory bind=127.0.0.1:49374
+No linha:13 caractere:1
++ & $am uninstall --only hooks > "$s\uninstall-hooks.txt" 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (2026-11-13T17:0...127.0.0.1:49374:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+would remove SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SessionEnd, SubagentStart, SubagentStop from C:\Users\usuario\.claude/settings.json
+would remove SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SessionEnd, SubagentStart, SubagentStop from C:\Users\usuario\.copilot\hooks\ai-memory.json
+would remove SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact, Stop, SessionEnd from C:\Users\usuario\.codex\hooks.json
+note: run `ai-memory uninstall --only hooks --apply` inside every other checkout that used `install-hooks --scope project`; their .claude/settings.local.json keeps calling this binary and data dir.
+(dry-run; pass --apply to remove)

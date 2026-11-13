@@ -1,0 +1,42 @@
+name: release
+
+# Dispara ao enviar uma tag vX.Y.Z. Gera o instalador NSIS assinado para o updater,
+# o latest.json e publica a release no GitHub.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Testes do backend
+        run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+      - name: Testes do frontend
+        run: npm test
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "AI Memory Manager ${{ github.ref_name }}"
+          releaseBody: "Veja CHANGELOG.md. Instale o setup NSIS; atualizações futuras chegam pelo próprio app."
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
