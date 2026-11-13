@@ -51,6 +51,7 @@ export const api = {
     invoke<T.ChangePlan>("plan_agent_change", { agent, component, action }),
   planCodexTokenFix: () => invoke<T.ChangePlan>("plan_codex_token_fix"),
   planCodexBridge: () => invoke<T.ChangePlan>("plan_codex_bridge"),
+  planCursorCompatHooks: () => invoke<T.ChangePlan>("plan_cursor_compat_hooks"),
   discardPlan: (planId: string) => invoke<void>("discard_plan", { planId }),
   applyPlan: (planId: string) => invoke<T.ApplyResult>("apply_plan", { planId }),
   testMcp: () => invoke<T.McpTests>("test_mcp"),

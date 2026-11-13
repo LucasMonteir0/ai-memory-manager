@@ -28,7 +28,9 @@ pub struct ChangePlan {
 #[derive(Debug, Clone)]
 pub enum Action {
     /// Comando oficial do ai-memory; na aplicação adiciona `apply_flags`.
-    Official { exe: PathBuf, args: Vec<String>, apply_flags: Vec<String>, cwd: Option<PathBuf>, timeout: Duration },
+    /// `flatten_hooks`: depois do comando, converte hooks ai-memory `command`+`args` desse arquivo
+    /// para uma única string (compatível com a importação do Cursor).
+    Official { exe: PathBuf, args: Vec<String>, apply_flags: Vec<String>, cwd: Option<PathBuf>, timeout: Duration, flatten_hooks: Option<PathBuf> },
     /// Edição cirúrgica feita pela GUI (conteúdo antigo esperado → novo).
     WriteFiles { writes: Vec<(PathBuf, Option<String>, String)> },
     Registry { key: String, name: String, new_value: Option<String>, expected_old_present: bool, secret: bool },
@@ -44,6 +46,8 @@ pub enum Verify {
     CodexMcp { file: PathBuf, present: bool },
     CodexBridge { file: PathBuf },
     Hooks { file: PathBuf, present: bool },
+    /// Hooks ai-memory presentes e nenhum no formato `command`+`args`.
+    HooksNoArgs { file: PathBuf },
     RegistryValue { key: String, name: String, present: bool },
     FileExists { file: PathBuf },
 }
@@ -129,6 +133,17 @@ pub fn verify(v: &Verify) -> Result<String, String> {
                 Err(format!("Esperado hooks {} mas foram encontrados {n} evento(s).", if *present { "presentes" } else { "ausentes" }))
             }
         }
+        Verify::HooksNoArgs { file } => {
+            let txt = std::fs::read_to_string(file).unwrap_or_default();
+            let val = configedit::parse_json(&txt).map_err(|e| format!("Arquivo ficou inválido: {e}"))?;
+            let n = configedit::scan_hooks(&val).events.len();
+            let left = configedit::count_args_form_hooks(&val);
+            if n > 0 && left == 0 {
+                Ok(format!("{n} evento(s) com hooks ai-memory em {}, todos em linha única.", file.display()))
+            } else {
+                Err(format!("Esperado hooks presentes sem `args`; encontrados {n} evento(s) e {left} hook(s) com `args`."))
+            }
+        }
         Verify::RegistryValue { key, name, present } => {
             let has = crate::service::reg_get(key, name).is_some();
             if has == *present {
@@ -189,7 +204,7 @@ pub async fn apply(p: &Planned, backups: &BackupStore) -> ApplyResult {
     let mut output = None;
     // 2) execução
     let exec: Result<(), String> = match &p.action {
-        Action::Official { exe, args, apply_flags, cwd, timeout } => {
+        Action::Official { exe, args, apply_flags, cwd, timeout, flatten_hooks } => {
             let mut all = args.clone();
             all.extend(apply_flags.iter().cloned());
             let mut spec = CmdSpec::new(exe, &[]).args_owned(all).timeout(*timeout);
@@ -201,7 +216,11 @@ pub async fn apply(p: &Planned, backups: &BackupStore) -> ApplyResult {
                     let ok = o.ok();
                     let code = o.exit_code;
                     output = Some(o);
-                    if ok { Ok(()) } else { Err(format!("Comando terminou com código {code:?}.")) }
+                    match (ok, flatten_hooks) {
+                        (false, _) => Err(format!("Comando terminou com código {code:?}.")),
+                        (true, Some(f)) => flatten_hook_args_in(f).map(|_| ()),
+                        (true, None) => Ok(()),
+                    }
                 }
                 Err(e) => Err(format!("Falha ao executar: {e}")),
             }
@@ -287,7 +306,56 @@ pub async fn apply(p: &Planned, backups: &BackupStore) -> ApplyResult {
     }
 }
 
+/// Reescreve no lugar os hooks ai-memory `command`+`args` de `file` como string única.
+/// Retorna quantos foram convertidos; arquivo sem conversões não é regravado.
+fn flatten_hook_args_in(file: &Path) -> Result<usize, String> {
+    let old = std::fs::read_to_string(file).map_err(|e| format!("Falha ao ler {}: {e}", file.display()))?;
+    let v = configedit::parse_json(&old).map_err(|e| format!("{} inválido: {e}", file.display()))?;
+    let (v2, done, _) = configedit::flatten_ai_memory_hook_args(v);
+    if done > 0 {
+        write_atomic(file, configedit::to_pretty_json(&v2).as_bytes()).map_err(|e| format!("Falha ao gravar {}: {e}", file.display()))?;
+    }
+    Ok(done)
+}
+
 // ---------------------------------------------------------------- construtores de planos
+
+/// Converte os hooks ai-memory do Claude Code de `command`+`args` para string única, para que a
+/// importação de hooks do Cursor (que descarta `args`) pare de bloquear os prompts.
+pub fn plan_cursor_compat_hooks(file: &Path) -> Result<Planned, String> {
+    let old = std::fs::read_to_string(file).map_err(|_| "~/.claude/settings.json não existe.".to_string())?;
+    let v = configedit::parse_json(&old).map_err(|e| e.to_string())?;
+    let (v2, done, skipped) = configedit::flatten_ai_memory_hook_args(v);
+    if done == 0 {
+        return Err(if skipped > 0 {
+            format!("{skipped} hook(s) usam caminhos com espaços ou caracteres especiais e não podem ser convertidos com segurança.")
+        } else {
+            "Os hooks do ai-memory já estão no formato compatível com o Cursor.".into()
+        });
+    }
+    let new = configedit::to_pretty_json(&v2);
+    let mut plan = new_plan(
+        "Claude Code: hooks compatíveis com o Cursor",
+        &format!(
+            "O Cursor também carrega os hooks do Claude Code, mas ignora o campo `args`: roda o ai-memory.exe sem argumentos, que imprime a ajuda e sai com código 2, e o Cursor bloqueia o prompt (ERROR_HOOKS_BLOCKED). Junta comando e argumentos de {done} hook(s) do ai-memory numa única linha, que o Claude Code e o Cursor entendem. Hooks de terceiros não são alterados."
+        ),
+    );
+    plan.agent_id = Some("claude-code".into());
+    plan.files = vec![file.to_string_lossy().to_string()];
+    plan.diffs = vec![FileDiff::new(&file.to_string_lossy(), &old, &new, true)];
+    if skipped > 0 {
+        plan.warnings.push(format!("{skipped} hook(s) com espaços ou caracteres especiais no caminho ficam como estão."));
+    }
+    plan.warnings.push("Com o Cursor instalado, este app já reaplica a conversão ao reinstalar os hooks do Claude Code; o `ai-memory setup`/`install-hooks` rodado fora do app volta ao formato antigo.".into());
+    plan.warnings.push("O Cursor também roda os hooks próprios dele: sessões do Cursor podem aparecer duas vezes (cursor e claude-code). Para evitar, desligue Settings → Agents → Third-Party Imports no Cursor.".into());
+    plan.after_steps = vec!["Mande um prompt novo no Cursor; ele não deve mais ser bloqueado.".into()];
+    Ok(Planned {
+        plan,
+        action: Action::WriteFiles { writes: vec![(file.to_path_buf(), Some(old), new)] },
+        backup_files: vec![file.to_path_buf()],
+        verify: Verify::HooksNoArgs { file: file.to_path_buf() },
+    })
+}
 
 /// Prévia de remoção cirúrgica do MCP ai-memory (JSON ou TOML do Codex).
 pub fn plan_disable_mcp(agent: &str, file: &Path) -> Result<Planned, String> {
@@ -464,6 +532,7 @@ pub async fn plan_official_install(
             apply_flags: vec!["--apply".into()],
             cwd: None,
             timeout: Duration::from_secs(120),
+            flatten_hooks: None,
         },
         backup_files: files,
         verify,
@@ -523,6 +592,7 @@ mod tests {
                 apply_flags: vec![],
                 cwd: None,
                 timeout: Duration::from_secs(10),
+                flatten_hooks: None,
             },
             backup_files: vec![f.clone()],
             verify: Verify::JsonMcp { file: f.clone(), present: true },
@@ -541,7 +611,7 @@ mod tests {
         let cmd = std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
         let planned = Planned {
             plan: new_plan("teste", "x"),
-            action: Action::Official { exe: cmd.into(), args: vec!["/d".into(), "/c".into(), "exit /b 0".into()], apply_flags: vec![], cwd: None, timeout: Duration::from_secs(10) },
+            action: Action::Official { exe: cmd.into(), args: vec!["/d".into(), "/c".into(), "exit /b 0".into()], apply_flags: vec![], cwd: None, timeout: Duration::from_secs(10), flatten_hooks: None },
             backup_files: vec![f.clone()],
             verify: Verify::JsonMcp { file: f.clone(), present: true },
         };

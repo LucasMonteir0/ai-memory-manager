@@ -264,6 +264,8 @@ export interface AgentReport {
   untrustedEvents: string[];
   restartHint: string;
   docsUrl: string;
+  /** hooks ai-memory em command+args que o Cursor importa sem os argumentos (bloqueia prompts) */
+  cursorHookConflict: number;
 }
 
 export interface CaptureEvidence {

@@ -41,6 +41,7 @@ pub fn run() {
             commands::plan_agent_change,
             commands::plan_codex_token_fix,
             commands::plan_codex_bridge,
+            commands::plan_cursor_compat_hooks,
             commands::get_plan,
             commands::discard_plan,
             commands::apply_plan,

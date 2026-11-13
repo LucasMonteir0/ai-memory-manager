@@ -152,6 +152,75 @@ pub fn remove_ai_memory_hooks(mut root: Value) -> Result<(Value, usize), EditErr
     Ok((root, removed))
 }
 
+/// Hook ai-memory no formato `command` + `args` (exec form do Claude Code).
+fn has_args_form(h: &Value) -> bool {
+    is_ai_memory_hook(h) && h.get("args").and_then(Value::as_array).is_some_and(|a| !a.is_empty())
+}
+
+/// Aplica `f` a cada entrada de hook (formatos agrupado e plano).
+fn for_each_hook_mut(root: &mut Value, mut f: impl FnMut(&mut Value)) {
+    let Some(hooks) = root.get_mut("hooks").and_then(Value::as_object_mut) else { return };
+    for arr in hooks.values_mut() {
+        let Some(list) = arr.as_array_mut() else { continue };
+        for entry in list.iter_mut() {
+            if let Some(inner) = entry.get_mut("hooks").and_then(Value::as_array_mut) {
+                inner.iter_mut().for_each(&mut f);
+            } else {
+                f(entry);
+            }
+        }
+    }
+}
+
+/// Quantos hooks ai-memory usam `command` + `args`. O Cursor importa os hooks do Claude Code
+/// mas ignora `args`: roda o ai-memory.exe sem argumentos, que imprime a ajuda e sai com código 2,
+/// e o Cursor trata o código 2 como bloqueio do prompt (ERROR_HOOKS_BLOCKED).
+pub fn count_args_form_hooks(root: &Value) -> usize {
+    let mut n = 0;
+    let mut copy = root.clone();
+    for_each_hook_mut(&mut copy, |h| {
+        if has_args_form(h) {
+            n += 1;
+        }
+    });
+    n
+}
+
+/// Uma parte do comando em forma que bash, cmd e PowerShell leem igual: barras normais
+/// (o Windows aceita) e sem aspas. Partes com espaço/aspas/metacaracteres não são convertíveis.
+fn portable_part(s: &str) -> Option<String> {
+    let p = s.replace('\\', "/");
+    let bad = |c: char| c.is_whitespace() || "\"'`$&|;<>(){}%^!,".contains(c);
+    if p.is_empty() || p.chars().any(bad) { None } else { Some(p) }
+}
+
+/// Converte hooks ai-memory de `command` + `args` para uma única string `command`, formato que
+/// o Claude Code e o Cursor entendem. Hooks de terceiros não são tocados. Retorna
+/// (novo valor, convertidos, não convertíveis).
+pub fn flatten_ai_memory_hook_args(mut root: Value) -> (Value, usize, usize) {
+    let (mut done, mut skipped) = (0, 0);
+    for_each_hook_mut(&mut root, |h| {
+        if !has_args_form(h) {
+            return;
+        }
+        let cmd = h.get("command").and_then(Value::as_str).unwrap_or("");
+        let args = h.get("args").and_then(Value::as_array).cloned().unwrap_or_default();
+        let parts: Option<Vec<String>> = std::iter::once(Some(cmd))
+            .chain(args.iter().map(Value::as_str))
+            .map(|p| p.and_then(portable_part))
+            .collect();
+        match (parts, h.as_object_mut()) {
+            (Some(parts), Some(obj)) => {
+                obj.insert("command".into(), Value::String(parts.join(" ")));
+                obj.remove("args");
+                done += 1;
+            }
+            _ => skipped += 1,
+        }
+    });
+    (root, done, skipped)
+}
+
 /// Entrada MCP em JSON (`mcpServers.<name>`).
 pub fn json_mcp_entry<'a>(root: &'a Value, name: &str) -> Option<&'a Value> {
     root.get("mcpServers").and_then(|m| m.get(name))
@@ -428,5 +497,39 @@ trusted_hash = "abc"
     #[test]
     fn invalid_toml_is_error() {
         assert!(codex_mcp("[[[", "ai-memory").is_err());
+    }
+
+    #[test]
+    fn flatten_args_hooks_for_cursor_compat_keeps_third_party() {
+        let v = json!({"hooks": {
+            "UserPromptSubmit": [{"matcher": "", "hooks": [
+                {"type": "command", "command": "C:\\Users\\U\\ai-memory\\ai-memory.exe",
+                 "args": ["--data-dir", "C:\\Users\\U\\data", "hook", "--event", "user-prompt-submit", "--agent", "claude-code", "--server-url", "http://127.0.0.1:49374"]},
+                {"type": "command", "command": "node", "args": ["meu-hook.js"]}
+            ]}],
+            "Stop": [{"hooks": [{"command": "C:\\x\\ai-memory.exe hook --event stop"}]}]
+        }});
+        assert_eq!(count_args_form_hooks(&v), 1);
+        let (v2, done, skipped) = flatten_ai_memory_hook_args(v);
+        assert_eq!((done, skipped), (1, 0));
+        assert_eq!(count_args_form_hooks(&v2), 0);
+        let h = &v2["hooks"]["UserPromptSubmit"][0]["hooks"];
+        assert_eq!(
+            h[0]["command"],
+            "C:/Users/U/ai-memory/ai-memory.exe --data-dir C:/Users/U/data hook --event user-prompt-submit --agent claude-code --server-url http://127.0.0.1:49374"
+        );
+        assert!(h[0].get("args").is_none());
+        assert_eq!(h[1], json!({"type": "command", "command": "node", "args": ["meu-hook.js"]}));
+        assert_eq!(scan_hooks(&v2).events.len(), 2);
+    }
+
+    #[test]
+    fn flatten_skips_paths_with_spaces() {
+        let v = json!({"hooks": {"Stop": [{"hooks": [
+            {"command": "C:\\Program Files\\ai-memory\\ai-memory.exe", "args": ["hook", "--event", "stop"]}
+        ]}]}});
+        let (v2, done, skipped) = flatten_ai_memory_hook_args(v.clone());
+        assert_eq!((done, skipped), (0, 1));
+        assert_eq!(v2, v);
     }
 }

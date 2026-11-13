@@ -641,6 +641,14 @@ pub async fn plan_agent_change(state: State<'_, AppState>, agent: String, compon
         let client_id = if component == "mcp" { report.mcp_client_id.clone() } else { report.hooks_agent_id.clone() }.ok_or("Sem suporte.")?;
         let extra: Vec<PathBuf> = agents::agent_files(&state.paths, &agent, &component, cd_cfg.as_deref()).into_iter().skip(1).collect();
         let mut p = changes::plan_official_install(&cli.exe, &agent, &component, &client_id, &file, extra).await?;
+        let cursor_compat = agent == "claude-code" && component == "hooks" && apps.cursor.installed == Some(true);
+        if let (true, Action::Official { flatten_hooks, .. }) = (cursor_compat, &mut p.action) {
+            *flatten_hooks = Some(file.clone());
+            p.plan.warnings.insert(
+                0,
+                "Cursor detectado: depois do instalador, os hooks do ai-memory são reescritos em linha única (command sem args). O Cursor importa os hooks do Claude Code ignorando `args` e bloquearia os prompts.".into(),
+            );
+        }
         if matches!(comp.status, agents::IntegrationStatus::Configured | agents::IntegrationStatus::Partial | agents::IntegrationStatus::Untrusted | agents::IntegrationStatus::Verified) {
             p.plan.warnings.insert(0, "Já existe configuração: o instalador oficial substitui apenas a entrada ai-memory (idempotente), sem duplicar.".into());
         }
@@ -703,6 +711,13 @@ pub async fn plan_codex_bridge(state: State<'_, AppState>) -> R<ChangePlan> {
         probe.server_version.unwrap_or_default(),
         probe.tool_count.unwrap_or(0)
     );
+    Ok(state.store_plan(p))
+}
+
+/// Converte os hooks ai-memory do Claude Code para linha única (compatível com o Cursor).
+#[tauri::command]
+pub fn plan_cursor_compat_hooks(state: State<'_, AppState>) -> R<ChangePlan> {
+    let p = changes::plan_cursor_compat_hooks(&state.paths.claude_settings())?;
     Ok(state.store_plan(p))
 }
 
@@ -1098,7 +1113,7 @@ pub async fn plan_uninstall(state: State<'_, AppState>, only: String) -> R<Chang
     plan.files = files.iter().map(|f| f.to_string_lossy().to_string()).collect();
     Ok(state.store_plan(Planned {
         plan,
-        action: Action::Official { exe: cli.exe.clone(), args, apply_flags: vec!["--apply".into(), "--yes".into()], cwd: None, timeout: Duration::from_secs(300) },
+        action: Action::Official { exe: cli.exe.clone(), args, apply_flags: vec!["--apply".into(), "--yes".into()], cwd: None, timeout: Duration::from_secs(300), flatten_hooks: None },
         backup_files: files,
         verify: Verify::None,
     }))

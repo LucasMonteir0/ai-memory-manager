@@ -80,6 +80,8 @@ pub struct AgentReport {
     pub untrusted_events: Vec<String>,
     pub restart_hint: String,
     pub docs_url: String,
+    /// Hooks ai-memory em `command` + `args` que o Cursor importa sem os argumentos (bloqueia prompts).
+    pub cursor_hook_conflict: usize,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -423,6 +425,17 @@ pub fn claude_code_report(ctx: &Ctx) -> AgentReport {
             ));
         }
     }
+    // O Cursor importa ~/.claude/settings.json mas descarta `args` (Q: ERROR_HOOKS_BLOCKED).
+    let cursor_hook_conflict = if ctx.apps.cursor.installed == Some(true) {
+        json_file(&p.claude_settings()).ok().flatten().map(|v| configedit::count_args_form_hooks(&v)).unwrap_or(0)
+    } else {
+        0
+    };
+    if cursor_hook_conflict > 0 {
+        hooks.evidence.push(format!(
+            "{cursor_hook_conflict} hook(s) em formato command+args: o Cursor importa esses hooks sem os argumentos e bloqueia os prompts."
+        ));
+    }
     let installed = ctx.apps.claude.installed.or(Some(p.claude_dir().exists()));
     AgentReport {
         id: "claude-code".into(),
@@ -439,6 +452,7 @@ pub fn claude_code_report(ctx: &Ctx) -> AgentReport {
         untrusted_events: vec![],
         restart_hint: "Feche e reabra o Claude Desktop (ou inicie uma nova sessão na aba Code) para carregar as mudanças.".into(),
         docs_url: "https://github.com/akitaonrails/ai-memory/blob/main/docs/mcp-install.md".into(),
+        cursor_hook_conflict,
     }
 }
 
@@ -551,6 +565,7 @@ pub fn codex_report(ctx: &Ctx) -> AgentReport {
         untrusted_events: untrusted,
         restart_hint: "Feche e reabra o Codex Desktop; se pedir aprovação de hooks, aprove na própria interface.".into(),
         docs_url: "https://github.com/akitaonrails/ai-memory/blob/main/docs/mcp-install.md".into(),
+        cursor_hook_conflict: 0,
     }
 }
 
@@ -599,6 +614,7 @@ pub fn cursor_report(ctx: &Ctx) -> AgentReport {
         untrusted_events: vec![],
         restart_hint: "Reinicie o Cursor (ou desligue/ligue o servidor em Settings → MCP).".into(),
         docs_url: "https://github.com/akitaonrails/ai-memory/blob/main/docs/mcp-install.md".into(),
+        cursor_hook_conflict: 0,
     }
 }
 
@@ -642,6 +658,7 @@ pub fn claude_desktop_report(ctx: &Ctx) -> AgentReport {
         untrusted_events: vec![],
         restart_hint: "Feche totalmente (bandeja) e reabra o Claude Desktop.".into(),
         docs_url: "https://github.com/akitaonrails/ai-memory/blob/main/docs/mcp-install.md".into(),
+        cursor_hook_conflict: 0,
     }
 }
 
@@ -661,6 +678,7 @@ pub fn cowork_report(ctx: &Ctx) -> AgentReport {
         untrusted_events: vec![],
         restart_hint: String::new(),
         docs_url: "https://github.com/akitaonrails/ai-memory/blob/main/docs/support-matrix.md".into(),
+        cursor_hook_conflict: 0,
     }
 }
 
@@ -688,6 +706,23 @@ mod tests {
             node_available: false,
             git_bash: None,
         }
+    }
+
+    #[test]
+    fn claude_args_hooks_flagged_only_when_cursor_installed() {
+        let (_d, p) = sandbox();
+        std::fs::create_dir_all(p.claude_dir()).unwrap();
+        std::fs::write(p.claude_settings(), r#"{"hooks":{"Stop":[{"hooks":[{"command":"C:\\x\\ai-memory.exe","args":["hook","--event","stop"]}]}]}}"#).unwrap();
+        let mut apps = apps_all();
+        let ctx = Ctx { paths: &p, apps: &apps, doctor: None, server_requires_token: true };
+        assert_eq!(claude_code_report(&ctx).cursor_hook_conflict, 1);
+        apps.cursor.installed = Some(false);
+        let ctx = Ctx { paths: &p, apps: &apps, doctor: None, server_requires_token: true };
+        assert_eq!(claude_code_report(&ctx).cursor_hook_conflict, 0);
+        std::fs::write(p.claude_settings(), r#"{"hooks":{"Stop":[{"hooks":[{"command":"C:/x/ai-memory.exe hook --event stop"}]}]}}"#).unwrap();
+        apps.cursor.installed = Some(true);
+        let ctx = Ctx { paths: &p, apps: &apps, doctor: None, server_requires_token: true };
+        assert_eq!(claude_code_report(&ctx).cursor_hook_conflict, 0);
     }
 
     #[test]

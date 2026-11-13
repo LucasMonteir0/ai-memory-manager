@@ -196,6 +196,19 @@ function AgentCard({ a, go }: { a: AgentReport; go: (p: Page) => void }) {
             </div>
           </Alert>
         )}
+        {a.cursorHookConflict > 0 && (
+          <Alert tone="err" title="Estes hooks bloqueiam os prompts no Cursor">
+            <div className="space-y-2">
+              <p>
+                O Cursor também carrega os hooks do Claude Code, mas ignora os argumentos (<code>args</code>). O <code>ai-memory.exe</code> roda sem
+                argumentos, imprime a ajuda, e o Cursor recusa o prompt com <code>ERROR_HOOKS_BLOCKED</code>. {a.cursorHookConflict} hook(s) afetado(s).
+              </p>
+              <Button size="sm" onClick={() => planner.start(() => api.planCursorCompatHooks())}>
+                <Wrench /> Converter para formato compatível
+              </Button>
+            </div>
+          </Alert>
+        )}
         {a.untrustedEvents.length > 0 && (
           <Alert tone="warn" title="Ação manual necessária no Codex Desktop">
             Abra o Codex Desktop e aprove os hooks pendentes ({a.untrustedEvents.join(", ")}). Não há API oficial para autorizar pela GUI; o comando{" "}
