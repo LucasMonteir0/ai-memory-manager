@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — 13/11/2026
+
+- Claude Code + Cursor: o Cursor importa os hooks do Claude Code ignorando `args` e bloqueava todo prompt (`ERROR_HOOKS_BLOCKED`). A central de agentes agora detecta o conflito, oferece converter os hooks do ai-memory para linha única (com prévia e backup) e já aplica a conversão ao instalar os hooks do Claude Code com o Cursor presente.
+
 ## 0.1.1 — 13/11/2026
 
 - Primeira release publicada (a tag v0.1.0 falhou no build por BOM no package.json; sem binários).
